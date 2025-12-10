@@ -1,7 +1,7 @@
-import { Router } from 'express'
-import { authController } from '../controllers/AuthController.js'
+import { Router } from 'express';
+import { authController } from '../controllers/AuthController.js';
 
-const router = Router()
+const router = Router();
 
 /**
  * @openapi
@@ -30,9 +30,8 @@ const router = Router()
  *       500:
  *         description: Erro interno.
  */
-router.post(
-    '/users/:id/generate-credentials',
-    (req, res, next) => authController.generateCredentials(req, res, next)
-)
+router.post('/users/:id/generate-credentials', (req, res, next) =>
+  authController.generateCredentials(req, res, next)
+);
 
-export default router
+export default router;

@@ -1,8 +1,8 @@
-import { Router } from 'express'
-import { userAuthController } from '../controllers/UserAuthController.js'
-import { userAuth } from '../middlewares/userAuth.js'
+import { Router } from 'express';
+import { userAuthController } from '../controllers/UserAuthController.js';
+import { userAuth } from '../middlewares/userAuth.js';
 
-const router = Router()
+const router = Router();
 
 /**
  * @openapi
@@ -43,9 +43,7 @@ const router = Router()
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/auth/register', (req, res, next) =>
-  userAuthController.register(req, res, next)
-)
+router.post('/auth/register', (req, res, next) => userAuthController.register(req, res, next));
 
 /**
  * @openapi
@@ -86,9 +84,7 @@ router.post('/auth/register', (req, res, next) =>
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/auth/login', (req, res, next) =>
-  userAuthController.login(req, res, next)
-)
+router.post('/auth/login', (req, res, next) => userAuthController.login(req, res, next));
 
 /**
  * @openapi
@@ -133,17 +129,17 @@ router.post('/auth/login', (req, res, next) =>
  */
 router.post('/auth/change-password', userAuth, (req, res, next) =>
   userAuthController.changePassword(req, res, next)
-)
+);
 
 // Public forgot-password (pre-login) using email + 2FA
 router.post('/auth/forgot/start', (req, res, next) =>
   userAuthController.forgotStart(req, res, next)
-)
+);
 router.post('/auth/forgot/verify', (req, res, next) =>
   userAuthController.forgotVerify(req, res, next)
-)
+);
 router.post('/auth/forgot/reset', (req, res, next) =>
   userAuthController.forgotReset(req, res, next)
-)
+);
 
-export default router
+export default router;

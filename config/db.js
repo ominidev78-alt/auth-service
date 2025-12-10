@@ -1,13 +1,13 @@
-import { Pool } from 'pg'
-import { env } from './env.js'
+import { Pool } from 'pg';
+import { env } from './env.js';
 
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-})
+  ssl: { rejectUnauthorized: false },
+});
 
 export async function initDb() {
-  console.log('[DB user-service] init...')
+  console.log('[DB user-service] init...');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -29,17 +29,17 @@ export async function initDb() {
       status TEXT DEFAULT 'ACTIVE',
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_users_cnpj
     ON users(cnpj);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_users_external_id
     ON users(external_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS wallets (
@@ -50,12 +50,12 @@ export async function initDb() {
       balance NUMERIC(18,2) NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_wallets_user_id
     ON wallets(user_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ledger_entries (
@@ -68,17 +68,17 @@ export async function initDb() {
       external_id TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_ledger_wallet_id
     ON ledger_entries(wallet_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_ledger_external_id
     ON ledger_entries(external_id);
-  `)
+  `);
 
   await pool.query(`
     DO $$
@@ -91,7 +91,7 @@ export async function initDb() {
         UPDATE ledger_entries SET external_id = 'legacy-' || id::text WHERE external_id = '';
       END IF;
     END $$;
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_fees (
@@ -105,7 +105,7 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     DO $$
@@ -138,12 +138,12 @@ export async function initDb() {
         ALTER TABLE user_fees ADD COLUMN pix_out_fee_value NUMERIC(18,2) NOT NULL DEFAULT 0;
       END IF;
     END $$;
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_user_fees_user_id
     ON user_fees(user_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_two_factor_auth (
@@ -160,17 +160,17 @@ export async function initDb() {
       updated_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(user_id, method)
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_two_factor_user_id
     ON user_two_factor_auth(user_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_two_factor_enabled
     ON user_two_factor_auth(user_id, enabled) WHERE enabled = TRUE;
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_recovery_codes (
@@ -181,17 +181,17 @@ export async function initDb() {
       used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_recovery_codes_user_id
     ON user_recovery_codes(user_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_recovery_codes_unused
     ON user_recovery_codes(user_id, used) WHERE used = FALSE;
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS two_factor_audit_log (
@@ -206,17 +206,17 @@ export async function initDb() {
       failure_reason TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_2fa_audit_user_id
     ON two_factor_audit_log(user_id);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_2fa_audit_created_at
     ON two_factor_audit_log(created_at DESC);
-  `)
+  `);
 
   await pool.query(`
     DO $$
@@ -235,7 +235,7 @@ export async function initDb() {
         ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'USER';
       END IF;
     END $$;
-  `)
+  `);
 
   await pool.query(`
     DO $$
@@ -247,7 +247,7 @@ export async function initDb() {
         ALTER TABLE users ADD COLUMN provider TEXT;
       END IF;
     END $$;
-  `)
+  `);
 
   await pool.query(`
     DO $$
@@ -274,7 +274,7 @@ export async function initDb() {
         ALTER TABLE users ADD COLUMN webhook_url_pix_out TEXT NULL;
       END IF;
     END $$;
-  `)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS providers (
@@ -285,17 +285,17 @@ export async function initDb() {
       active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_providers_code
     ON providers(code);
-  `)
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_providers_active
     ON providers(active);
-  `)
+  `);
 
-  console.log('[DB user-service] ok.')
+  console.log('[DB user-service] ok.');
 }

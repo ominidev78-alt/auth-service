@@ -1,8 +1,8 @@
-import { Router } from 'express'
-import { twoFactorAuthController } from '../controllers/TwoFactorAuthController.js'
-import { userAuth } from '../middlewares/userAuth.js'
+import { Router } from 'express';
+import { twoFactorAuthController } from '../controllers/TwoFactorAuthController.js';
+import { userAuth } from '../middlewares/userAuth.js';
 
-const router = Router()
+const router = Router();
 
 /**
  * @openapi
@@ -29,7 +29,7 @@ const router = Router()
  */
 router.post('/2fa/setup', userAuth, (req, res, next) =>
   twoFactorAuthController.setup(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -61,7 +61,7 @@ router.post('/2fa/setup', userAuth, (req, res, next) =>
  */
 router.post('/2fa/enable', userAuth, (req, res, next) =>
   twoFactorAuthController.enable(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -94,7 +94,7 @@ router.post('/2fa/enable', userAuth, (req, res, next) =>
  */
 router.post('/2fa/disable', userAuth, (req, res, next) =>
   twoFactorAuthController.disable(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -112,7 +112,7 @@ router.post('/2fa/disable', userAuth, (req, res, next) =>
  */
 router.get('/2fa/status', userAuth, (req, res, next) =>
   twoFactorAuthController.status(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -145,7 +145,7 @@ router.get('/2fa/status', userAuth, (req, res, next) =>
  */
 router.post('/2fa/verify', userAuth, (req, res, next) =>
   twoFactorAuthController.verify(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -178,7 +178,7 @@ router.post('/2fa/verify', userAuth, (req, res, next) =>
  */
 router.post('/2fa/recovery-codes', userAuth, (req, res, next) =>
   twoFactorAuthController.generateRecoveryCodes(req, res, next)
-)
+);
 
 /**
  * @openapi
@@ -202,7 +202,6 @@ router.post('/2fa/recovery-codes', userAuth, (req, res, next) =>
  */
 router.get('/2fa/audit-logs', userAuth, (req, res, next) =>
   twoFactorAuthController.getAuditLogs(req, res, next)
-)
+);
 
-export default router
-
+export default router;

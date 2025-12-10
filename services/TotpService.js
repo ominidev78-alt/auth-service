@@ -1,11 +1,11 @@
-import { authenticator } from 'otplib'
-import crypto from 'crypto'
+import { authenticator } from 'otplib';
+import crypto from 'crypto';
 
 // Configure TOTP according to RFC 6238
 authenticator.options = {
   step: 30, // 30 seconds per code
-  window: [1, 1] // Accept codes from -1 to +1 period (90 seconds total)
-}
+  window: [1, 1], // Accept codes from -1 to +1 period (90 seconds total)
+};
 
 export class TotpService {
   /**
@@ -13,7 +13,7 @@ export class TotpService {
    * @returns {string} Base32 encoded secret
    */
   static generateSecret() {
-    return authenticator.generateSecret()
+    return authenticator.generateSecret();
   }
 
   /**
@@ -22,7 +22,7 @@ export class TotpService {
    * @returns {string} 6-digit code
    */
   static generateToken(secret) {
-    return authenticator.generate(secret)
+    return authenticator.generate(secret);
   }
 
   /**
@@ -33,9 +33,9 @@ export class TotpService {
    */
   static verifyToken(token, secret) {
     try {
-      return authenticator.verify({ token, secret })
+      return authenticator.verify({ token, secret });
     } catch (error) {
-      return false
+      return false;
     }
   }
 
@@ -47,7 +47,7 @@ export class TotpService {
    * @returns {string} otpauth:// URL
    */
   static generateOtpAuthUrl(secret, email, issuer = 'Mutual Fintech') {
-    return authenticator.keyuri(email, issuer, secret)
+    return authenticator.keyuri(email, issuer, secret);
   }
 
   /**
@@ -56,13 +56,13 @@ export class TotpService {
    * @returns {string[]} Array of recovery codes
    */
   static generateRecoveryCodes(count = 10) {
-    const codes = []
+    const codes = [];
     for (let i = 0; i < count; i++) {
       // Generate 8-character alphanumeric code
-      const code = crypto.randomBytes(4).toString('hex').toUpperCase()
-      codes.push(code)
+      const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+      codes.push(code);
     }
-    return codes
+    return codes;
   }
 
   /**
@@ -71,7 +71,7 @@ export class TotpService {
    * @returns {string} SHA-256 hash
    */
   static hashRecoveryCode(code) {
-    return crypto.createHash('sha256').update(code.toUpperCase()).digest('hex')
+    return crypto.createHash('sha256').update(code.toUpperCase()).digest('hex');
   }
 
   /**
@@ -81,11 +81,7 @@ export class TotpService {
    * @returns {boolean} True if valid
    */
   static verifyRecoveryCode(code, hash) {
-    const codeHash = this.hashRecoveryCode(code)
-    return crypto.timingSafeEqual(
-      Buffer.from(codeHash, 'hex'),
-      Buffer.from(hash, 'hex')
-    )
+    const codeHash = this.hashRecoveryCode(code);
+    return crypto.timingSafeEqual(Buffer.from(codeHash, 'hex'), Buffer.from(hash, 'hex'));
   }
 }
-
