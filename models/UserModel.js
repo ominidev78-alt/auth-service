@@ -1,4 +1,4 @@
-import { db } from '../config/db.js'
+import { pool } from '../config/db.js'
 import crypto from 'crypto'
 
 export class UserModel {
@@ -15,7 +15,7 @@ export class UserModel {
     gatewayFeePercent,
     partnerFeePercent
   }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       INSERT INTO users (
         name,
@@ -71,7 +71,7 @@ export class UserModel {
     appId = null,
     clientSecret = null
   }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       INSERT INTO users (
         name,
@@ -113,8 +113,8 @@ export class UserModel {
   }) {
     // Normalizar email para lowercase
     const normalizedEmail = email ? String(email).toLowerCase().trim() : null
-
-    const { rows } = await db.query(
+    
+    const { rows } = await pool.query(
       `
       INSERT INTO users (
         name,
@@ -159,7 +159,7 @@ export class UserModel {
   }
 
   static async findAll() {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       SELECT
         id,
@@ -190,7 +190,7 @@ export class UserModel {
   }
 
   static async findById(id) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       SELECT
         id,
@@ -234,8 +234,8 @@ export class UserModel {
     if (!normalizedEmail) {
       return null
     }
-
-    const { rows } = await db.query(
+    
+    const { rows } = await pool.query(
       `
       SELECT *
       FROM users
@@ -250,8 +250,8 @@ export class UserModel {
 
   static async findByAppId(appId) {
     if (!appId) return null
-
-    const { rows } = await db.query(
+    
+    const { rows } = await pool.query(
       `
       SELECT
         id,
@@ -290,7 +290,7 @@ export class UserModel {
   }
 
   static async updateDocStatus(id, { status, notes }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -307,7 +307,7 @@ export class UserModel {
   }
 
   static async updateSplit(id, { gatewayFeePercent, partnerFeePercent }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -327,7 +327,7 @@ export class UserModel {
   }
 
   static async updateProvider(id, provider) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -342,7 +342,7 @@ export class UserModel {
   }
 
   static async updateConfig(id, { webhook_url, webhook_url_pix_in, webhook_url_pix_out, ip_whitelist }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -360,7 +360,7 @@ export class UserModel {
   }
 
   static async updatePassword({ userId, passwordHash }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -375,7 +375,7 @@ export class UserModel {
   }
 
   static async updateCredentials({ id, appId, clientSecret }) {
-    const { rows } = await db.query(
+    const { rows } = await pool.query(
       `
       UPDATE users
       SET
@@ -418,7 +418,7 @@ export class UserModel {
 
   static async findTreasuryUser() {
     try {
-      const { rows } = await db.query(
+      const { rows } = await pool.query(
         `
         SELECT *
         FROM users
