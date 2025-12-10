@@ -4,8 +4,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node ./src/server.js",
+    "dev": "nodemon ./src/server.js",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "axios": "^1.7.0",
@@ -24,5 +25,10 @@
     "swagger-ui-dist": "^5.17.14",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.7.4"
   }
 }

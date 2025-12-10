@@ -1,5 +1,5 @@
-import dotenv from 'dotenv'
-dotenv.config()
+import dotenv from 'dotenv';
+dotenv.config();
 
 export const env = {
   PORT: process.env.PORT || 3001,
@@ -7,5 +7,5 @@ export const env = {
   JWT_USER_SECRET: process.env.JWT_USER_SECRET,
   JWT_OPERATOR_SECRET: process.env.JWT_OPERATOR_SECRET,
   JWT_ADMIN_SECRET: process.env.JWT_ADMIN_SECRET,
-  NODE_ENV: process.env.NODE_ENV
-}
+  NODE_ENV: process.env.NODE_ENV,
+};
