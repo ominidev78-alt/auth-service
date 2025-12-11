@@ -4,6 +4,7 @@ import authRoutes from './auth.routes.js';
 import userAuthRoutes from './auth.user.routes.js';
 import twoFactorAuthRoutes from './twoFactorAuth.routes.js';
 import internalRoutes from './internal.routes.js';
+import publicRoutes from './public.routes.js';
 
 const router = Router();
 
@@ -11,5 +12,6 @@ router.use('/api', authRoutes);
 router.use('/api', userAuthRoutes);
 router.use('/api', twoFactorAuthRoutes);
 router.use('/api/internal', internalRoutes);
+router.use('/api/public', publicRoutes);
 
 export default router;
