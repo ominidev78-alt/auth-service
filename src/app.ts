@@ -84,16 +84,16 @@ const httpsAgent = new https.Agent({ keepAlive: true })
 
 export const httpClient = axios.create({
   timeout: 15000,
-  httpAgent: httpAgent as any,
-  httpsAgent: httpsAgent as any
-})
+  httpAgent,
+  httpsAgent
+} as any)
 
 export const userService = axios.create({
   baseURL: env.USER_SERVICE_URL,
   timeout: 15000,
-  httpAgent: httpAgent as any,
-  httpsAgent: httpsAgent as any
-})
+  httpAgent,
+  httpsAgent
+} as any)
 
 if (env.ENABLE_SWAGGER === 'true' || env.NODE_ENV !== 'production') {
   app.get('/docs-json', (req: express.Request, res: express.Response) => res.json(swaggerSpec))

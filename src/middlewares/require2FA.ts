@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from 'express';
 import { TwoFactorAuthModel } from '../models/TwoFactorAuthModel.js';
 import { TotpService } from '../services/TotpService.js';
 import { HttpError } from '../core/HttpError.js';
@@ -6,7 +7,7 @@ import { HttpError } from '../core/HttpError.js';
  * Middleware to require 2FA verification for protected operations
  * Expects 2FA code in req.body.code or req.body.recoveryCode
  */
-export async function require2FA(req, res, next) {
+export async function require2FA(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id || req.user?.userId;
     if (!userId) {
@@ -30,8 +31,8 @@ export async function require2FA(req, res, next) {
     }
 
     // Get code from body
-    const code = req.body.code;
-    const recoveryCode = req.body.recoveryCode;
+    const code = req.body.code as string | undefined;
+    const recoveryCode = req.body.recoveryCode as string | undefined;
 
     if (!code && !recoveryCode) {
       throw new HttpError(400, 'TwoFactorCodeRequired', {
@@ -43,15 +44,15 @@ export async function require2FA(req, res, next) {
 
     if (recoveryCode) {
       isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, recoveryCode);
-    } else if (code) {
+    } else if (code && config.secret) {
       isValid = TotpService.verifyToken(code, config.secret);
     }
 
     if (!isValid) {
       const failure = await TwoFactorAuthModel.recordFailure(userId);
 
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-      const userAgent = req.headers['user-agent'] || null;
+      const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null) as string | null;
+      const userAgent = (req.headers['user-agent'] || null) as string | null;
       const context = req.path || 'UNKNOWN';
 
       await TwoFactorAuthModel.addAuditLog({
@@ -80,8 +81,8 @@ export async function require2FA(req, res, next) {
     // Record success
     await TwoFactorAuthModel.recordSuccess(userId);
 
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-    const userAgent = req.headers['user-agent'] || null;
+    const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null) as string | null;
+    const userAgent = (req.headers['user-agent'] || null) as string | null;
     const context = req.path || 'UNKNOWN';
 
     await TwoFactorAuthModel.addAuditLog({
