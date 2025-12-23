@@ -149,6 +149,38 @@ router.post('/2fa/verify', userAuth, (req, res, next) =>
 
 /**
  * @openapi
+ * /api/2fa/verify-recovery:
+ *   post:
+ *     summary: Verifica código de recuperação do 2FA
+ *     tags: [TwoFactorAuth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Código de recuperação (recoveryCode)
+ *     responses:
+ *       200:
+ *         description: Código verificado com sucesso
+ *       400:
+ *         description: Código inválido
+ *       401:
+ *         description: Não autenticado
+ */
+router.post('/2fa/verify-recovery', userAuth, (req, res, next) =>
+  twoFactorAuthController.verifyRecovery(req, res, next)
+);
+
+/**
+ * @openapi
  * /api/2fa/recovery-codes:
  *   post:
  *     summary: Gera novos códigos de recuperação
