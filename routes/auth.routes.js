@@ -57,7 +57,7 @@ router.post('/auth/token', (req, res, next) =>
  *             properties:
  *               email:
  *                 type: string
- *                 example: admin@mutual.com
+ *                 example: admin@pagandu.com
  *               password:
  *                 type: string
  *                 example: "123456"

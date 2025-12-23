@@ -25,7 +25,6 @@ const allowedOrigins = [
   'https://api.pagandu.com',
   'https://admin.pagandu.com',
   'https://payg2a.online',
-  'https://mutual-fintech-front-end-paas.vercel.app',
   'https://omnigateway.site',
   'https://admin.omnigateway.site'
 ]
