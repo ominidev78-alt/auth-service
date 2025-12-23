@@ -13,9 +13,6 @@ const disableSchema = Joi.object({
     code: Joi.string().length(6).pattern(/^\d+$/).required()
 });
 export class TwoFactorAuthController {
-    /**
-     * Start 2FA setup process
-     */
     async setup(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -27,20 +24,16 @@ export class TwoFactorAuthController {
                 throw new HttpError(400, 'ValidationError', { details: error.details });
             }
             const { method } = value;
-            // Check if already enabled
             const existing = await TwoFactorAuthModel.findByUserId(userId);
             if (existing?.enabled) {
                 throw new HttpError(400, 'TwoFactorAlreadyEnabled', {
                     message: 'O segundo fator de autenticação já está ativo.'
                 });
             }
-            // Generate new secret
             const secret = TotpService.generateSecret();
             const user = req.user;
-            // Standardize issuer name
             const issuer = 'Pagandu Fintech';
             const otpAuthUrl = TotpService.generateOtpAuthUrl(secret, user.email, issuer);
-            // Save secret (but not enabled yet)
             await TwoFactorAuthModel.upsert({
                 userId,
                 method,
@@ -48,9 +41,7 @@ export class TwoFactorAuthController {
                 enabled: false,
                 verified: false
             });
-            // Generate QR Code as data URL
             const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
-            // Log setup start
             const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
             const userAgent = (req.headers['user-agent'] || null);
             await TwoFactorAuthModel.addAuditLog({
@@ -63,7 +54,7 @@ export class TwoFactorAuthController {
             });
             return res.json({
                 ok: true,
-                secret, // Show secret to user for manual entry
+                secret,
                 qrCode: qrCodeDataUrl,
                 method
             });
@@ -72,9 +63,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Verify and enable 2FA
-     */
     async enable(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -95,7 +83,6 @@ export class TwoFactorAuthController {
             if (config.enabled) {
                 throw new HttpError(400, 'TwoFactorAlreadyEnabled');
             }
-            // Verify token
             const isValid = TotpService.verifyToken(code, config.secret);
             if (!isValid) {
                 const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
@@ -113,12 +100,9 @@ export class TwoFactorAuthController {
                     message: 'Código de verificação inválido.'
                 });
             }
-            // Enable 2FA
             await TwoFactorAuthModel.enable(userId);
-            // Generate recovery codes
             const recoveryCodes = TotpService.generateRecoveryCodes(10);
             await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes);
-            // Log success
             const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
             const userAgent = (req.headers['user-agent'] || null);
             await TwoFactorAuthModel.addAuditLog({
@@ -132,16 +116,13 @@ export class TwoFactorAuthController {
             return res.json({
                 ok: true,
                 message: 'Segundo fator de autenticação ativado com sucesso.',
-                recoveryCodes // Show only once
+                recoveryCodes
             });
         }
         catch (err) {
             return next(err);
         }
     }
-    /**
-     * Disable 2FA
-     */
     async disable(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -157,7 +138,6 @@ export class TwoFactorAuthController {
             if (!config || !config.enabled) {
                 throw new HttpError(400, 'TwoFactorNotEnabled');
             }
-            // Verify token
             const isValid = TotpService.verifyToken(code, config.secret);
             if (!isValid) {
                 const failure = await TwoFactorAuthModel.recordFailure(userId);
@@ -182,9 +162,7 @@ export class TwoFactorAuthController {
                     attemptsRemaining: 3 - failure.attempts
                 });
             }
-            // Disable 2FA
             await TwoFactorAuthModel.disable(userId);
-            // Log success
             const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
             const userAgent = (req.headers['user-agent'] || null);
             await TwoFactorAuthModel.addAuditLog({
@@ -204,9 +182,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Get 2FA status
-     */
     async status(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -227,9 +202,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Verify code (used for sensitive operations or re-login)
-     */
     async verify(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -245,14 +217,12 @@ export class TwoFactorAuthController {
             if (!config || !config.enabled) {
                 throw new HttpError(400, 'TwoFactorNotEnabled');
             }
-            // Check if locked
             const isLocked = await TwoFactorAuthModel.isLocked(userId);
             if (isLocked) {
                 throw new HttpError(423, 'TwoFactorLocked', {
                     message: '2FA está temporariamente bloqueado devido a múltiplas tentativas falhas.'
                 });
             }
-            // Verify token
             const isValid = TotpService.verifyToken(code, config.secret);
             const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
             const userAgent = (req.headers['user-agent'] || null);
@@ -277,7 +247,6 @@ export class TwoFactorAuthController {
                     attemptsRemaining: 3 - failure.attempts
                 });
             }
-            // Record success
             await TwoFactorAuthModel.recordSuccess(userId);
             await TwoFactorAuthModel.addAuditLog({
                 userId,
@@ -296,9 +265,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Verify recovery code
-     */
     async verifyRecovery(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -330,7 +296,6 @@ export class TwoFactorAuthController {
                     message: 'Código de recuperação inválido.'
                 });
             }
-            // Record success
             await TwoFactorAuthModel.recordSuccess(userId);
             await TwoFactorAuthModel.addAuditLog({
                 userId,
@@ -349,9 +314,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Generate new recovery codes
-     */
     async regenerateRecoveryCodes(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;
@@ -368,15 +330,12 @@ export class TwoFactorAuthController {
             if (!config || !config.enabled) {
                 throw new HttpError(400, 'TwoFactorNotEnabled');
             }
-            // Verify token first
             const isValid = TotpService.verifyToken(code, config.secret);
             if (!isValid) {
                 throw new HttpError(400, 'InvalidCode');
             }
-            // Generate recovery codes
             const recoveryCodes = TotpService.generateRecoveryCodes(10);
             await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes);
-            // Log success
             const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
             const userAgent = (req.headers['user-agent'] || null);
             await TwoFactorAuthModel.addAuditLog({
@@ -397,9 +356,6 @@ export class TwoFactorAuthController {
             return next(err);
         }
     }
-    /**
-     * Get audit logs
-     */
     async auditLogs(req, res, next) {
         try {
             const userId = req.user?.id || req.user?.userId;

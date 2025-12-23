@@ -7,7 +7,6 @@ import compression from 'compression';
 import { v4 as uuid } from 'uuid';
 import http from 'http';
 import https from 'https';
-import axios from 'axios';
 import routes from './routes/index.js';
 import { notFoundHandler, globalErrorHandler } from './core/errorHandler.js';
 import { swaggerSpec, getSwaggerHtml } from './swagger/swagger.js';
@@ -74,16 +73,16 @@ app.use((req, res, next) => {
 });
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
-export const httpClient = axios.create({
-    timeout: 15000,
-    httpAgent,
-    httpsAgent
+import got from 'got';
+export const httpClient = got.extend({
+    timeout: { request: 15000 },
+    responseType: 'json'
 });
-export const userService = axios.create({
-    baseURL: env.USER_SERVICE_URL,
-    timeout: 15000,
-    httpAgent,
-    httpsAgent
+export const userService = got.extend({
+    prefixUrl: env.USER_SERVICE_URL,
+    timeout: { request: 15000 },
+    retry: { limit: 2 },
+    responseType: 'json'
 });
 if (env.ENABLE_SWAGGER === 'true' || env.NODE_ENV !== 'production') {
     app.get('/docs-json', (req, res) => res.json(swaggerSpec));
@@ -92,7 +91,6 @@ if (env.ENABLE_SWAGGER === 'true' || env.NODE_ENV !== 'production') {
         res.send(getSwaggerHtml());
     });
 }
-// Direto para Auth (facilitar integrações core)
 app.post('/api/auth/login', (req, res, next) => userAuthController.login(req, res, next));
 app.post('/api/auth/register', (req, res, next) => userAuthController.register(req, res, next));
 app.use(routes);

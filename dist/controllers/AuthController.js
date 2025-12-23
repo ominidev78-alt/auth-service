@@ -23,7 +23,7 @@ export class AuthController {
             await UserModel.updateCredentials({
                 id: userId,
                 appId,
-                clientSecret: clientSecret // Using the plain secret as the model expects, later the model might hash it or it's stored plain if that's the intention. Wait, the previous code used clientSecretHash. Let's check UserModel.
+                clientSecret: clientSecret
             });
             return res.json({
                 ok: true,

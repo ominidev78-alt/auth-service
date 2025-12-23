@@ -67,7 +67,6 @@ export class UserAuthController {
             if (!partnerName || String(partnerName).trim() === '') {
                 partnerName = name || companyName;
             }
-            // Normalizar email para lowercase antes de verificar e criar
             const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
             if (!normalizedEmail) {
                 throw new HttpError(400, 'E-mail inválido');
@@ -88,7 +87,6 @@ export class UserAuthController {
                 partnerName: partnerName || name,
                 externalId: externalId || null
             });
-            // Gera credenciais automaticamente para novos usuários
             let appId = user.app_id || null;
             let clientSecret = user.client_secret || null;
             if (!appId || !clientSecret) {
@@ -143,7 +141,6 @@ export class UserAuthController {
                 throw new HttpError(400, 'Payload inválido', { details: error.details });
             }
             const { email, password, code, recoveryCode } = value;
-            // Normalizar email para lowercase antes de buscar
             const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
             if (!normalizedEmail) {
                 throw new HttpError(401, 'Credenciais inválidas');
@@ -157,8 +154,6 @@ export class UserAuthController {
                 });
                 throw new HttpError(401, 'Credenciais inválidas');
             }
-            // Validação de status - permite PENDING, ACTIVE e NULL (novos usuários)
-            // Bloqueia apenas se status for explicitamente 'INACTIVE' ou 'BLOCKED'
             if (user.status && ['INACTIVE', 'BLOCKED'].includes(user.status.toUpperCase())) {
                 console.log('[UserAuthController.login] Usuário bloqueado ou inativo:', {
                     userId: user.id,
@@ -166,8 +161,6 @@ export class UserAuthController {
                 });
                 throw new HttpError(403, 'Usuário bloqueado ou inativo', { status: user.status });
             }
-            // Validação de doc_status - permite PENDING para login
-            // Bloqueia apenas se estiver explicitamente REJECTED
             if (user.doc_status && user.doc_status.toUpperCase() === 'REJECTED') {
                 console.log('[UserAuthController.login] Documentação rejeitada:', {
                     userId: user.id,
@@ -184,11 +177,9 @@ export class UserAuthController {
                 throw new HttpError(401, 'Credenciais inválidas');
             }
             console.log('[UserAuthController.login] Senha válida, prosseguindo com 2FA se necessário');
-            // Check if 2FA is enabled
             const twoFactorConfig = await TwoFactorAuthModel.findByUserId(user.id);
             const twoFactorEnabled = twoFactorConfig?.enabled || false;
             if (twoFactorEnabled) {
-                // 2FA is required - verify code
                 if (!code && !recoveryCode) {
                     return res.status(200).json({
                         ok: false,
@@ -196,7 +187,6 @@ export class UserAuthController {
                         message: 'Código 2FA é obrigatório'
                     });
                 }
-                // Check if locked
                 const isLocked = await TwoFactorAuthModel.isLocked(user.id);
                 if (isLocked) {
                     throw new HttpError(423, 'TwoFactorLocked', {
@@ -234,7 +224,6 @@ export class UserAuthController {
                         attemptsRemaining: 3 - failure.attempts
                     });
                 }
-                // Record successful 2FA verification
                 await TwoFactorAuthModel.recordSuccess(user.id);
                 const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
                 const userAgent = req.headers['user-agent'] || null;
@@ -248,7 +237,6 @@ export class UserAuthController {
                     success: true
                 });
             }
-            // Garante que o usuário tenha credenciais (app_id e client_secret)
             let appId = user.app_id || null;
             let clientSecret = user.client_secret || null;
             if (!appId || !clientSecret) {
@@ -256,7 +244,6 @@ export class UserAuthController {
                 const generated = await UserModel.generateAndUpdateCredentials(user.id);
                 appId = generated.appId;
                 clientSecret = generated.clientSecret;
-                // Atualiza o objeto user com as novas credenciais
                 user.app_id = appId;
                 user.client_secret = clientSecret;
             }
@@ -356,18 +343,15 @@ export class UserAuthController {
             if (!user || !user.password_hash) {
                 throw new HttpError(404, 'UserNotFound');
             }
-            // Verify current password
             const passwordOk = await bcrypt.compare(currentPassword, user.password_hash);
             if (!passwordOk) {
                 throw new HttpError(401, 'InvalidPassword', {
                     message: 'Senha atual incorreta'
                 });
             }
-            // Check if 2FA is enabled
             const twoFactorConfig = await TwoFactorAuthModel.findByUserId(userId);
             const twoFactorEnabled = twoFactorConfig?.enabled || false;
             if (twoFactorEnabled) {
-                // 2FA is required - verify code
                 if (!code && !recoveryCode) {
                     return res.status(200).json({
                         ok: false,
@@ -375,7 +359,6 @@ export class UserAuthController {
                         message: 'Código 2FA é obrigatório para alterar a senha'
                     });
                 }
-                // Check if locked
                 const isLocked = await TwoFactorAuthModel.isLocked(userId);
                 if (isLocked) {
                     throw new HttpError(423, 'TwoFactorLocked', {
@@ -413,7 +396,6 @@ export class UserAuthController {
                         attemptsRemaining: 3 - failure.attempts
                     });
                 }
-                // Record successful 2FA verification
                 await TwoFactorAuthModel.recordSuccess(userId);
                 const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
                 const userAgent = req.headers['user-agent'] || null;
@@ -427,14 +409,11 @@ export class UserAuthController {
                     success: true
                 });
             }
-            // Hash new password
             const newPasswordHash = await bcrypt.hash(newPassword, 10);
-            // Update password
             await UserModel.updatePassword({
                 userId,
                 passwordHash: newPasswordHash
             });
-            // Log password change
             if (twoFactorEnabled) {
                 const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
                 const userAgent = req.headers['user-agent'] || null;
@@ -457,7 +436,6 @@ export class UserAuthController {
             return next(err);
         }
     }
-    // --- Public Forgot Password Flow ---
     async forgotStart(req, res, next) {
         try {
             const email = String(req.body?.email || '').trim().toLowerCase();
@@ -469,7 +447,6 @@ export class UserAuthController {
             const twoFactorConfig = await TwoFactorAuthModel.findByUserId(user.id);
             const twoFactorEnabled = twoFactorConfig?.enabled || false;
             if (!twoFactorEnabled) {
-                // For security, require support if 2FA not enabled
                 return res.status(400).json({ ok: false, message: '2FA não está ativo para esta conta. Contate o suporte.' });
             }
             return res.json({ ok: true, message: 'Inicie a verificação com seu código 2FA ou código de recuperação.' });
@@ -494,7 +471,6 @@ export class UserAuthController {
             const twoFactorEnabled = twoFactorConfig?.enabled || false;
             if (!twoFactorEnabled)
                 throw new HttpError(400, '2FA não está ativo para esta conta');
-            // Check lock
             const isLocked = await TwoFactorAuthModel.isLocked(user.id);
             if (isLocked) {
                 throw new HttpError(423, 'TwoFactorLocked', {
@@ -516,7 +492,6 @@ export class UserAuthController {
                 throw new HttpError(400, 'InvalidCode', { message: 'Código 2FA inválido', attemptsRemaining: 3 - failure.attempts });
             }
             await TwoFactorAuthModel.recordSuccess(user.id);
-            // Issue short-lived reset token
             const resetToken = jwt.sign({ action: 'PWD_RESET', userId: user.id }, JWT_USER_SECRET, { expiresIn: '15m' });
             return res.json({ ok: true, resetToken });
         }
@@ -535,7 +510,6 @@ export class UserAuthController {
                 throw new HttpError(400, 'Nova senha inválida');
             if (!resetToken)
                 throw new HttpError(400, 'resetToken é obrigatório');
-            // Verify reset token
             let payload;
             try {
                 payload = jwt.verify(resetToken, JWT_USER_SECRET);
