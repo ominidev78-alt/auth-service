@@ -1,8 +1,11 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
+import { initDb } from './config/db.js';
 
 async function start() {
   try {
+    await initDb();
+
     const PORT = env.PORT || 3001;
 
     app.listen(PORT, '0.0.0.0', () => {
