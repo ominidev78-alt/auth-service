@@ -1,5 +1,0 @@
-import express from 'express';
-import { authController } from '../controllers/AuthController.js';
-const router = express.Router();
-router.post('/users/:id/generate-credentials', (req, res, next) => authController.generateCredentials(req, res, next));
-export default router;
