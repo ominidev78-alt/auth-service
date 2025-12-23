@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express from 'express';
 
 import authRoutes from './auth.routes.js';
 import userAuthRoutes from './auth.user.routes.js';
@@ -8,7 +8,7 @@ import publicRoutes from './public.routes.js';
 import adminMaintenanceRoutes from './admin.maintenance.routes.js';
 import healthRoutes from './health.routes.js';
 
-const router = Router();
+const router = express.Router();
 
 router.use('/', healthRoutes);
 router.use('/api', authRoutes);
