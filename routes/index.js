@@ -6,9 +6,11 @@ import twoFactorAuthRoutes from './twoFactorAuth.routes.js';
 import internalRoutes from './internal.routes.js';
 import publicRoutes from './public.routes.js';
 import adminMaintenanceRoutes from './admin.maintenance.routes.js';
+import healthRoutes from './health.routes.js';
 
 const router = Router();
 
+router.use('/', healthRoutes);
 router.use('/api', authRoutes);
 router.use('/api', userAuthRoutes);
 router.use('/api', twoFactorAuthRoutes);
