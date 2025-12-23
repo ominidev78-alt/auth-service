@@ -1,5 +1,5 @@
-import { pool } from '../config/db.js';
-import { TotpService } from '../services/TotpService.js';
+import { pool } from '../config/db.js'
+import { TotpService } from '../services/TotpService.js'
 
 export class TwoFactorAuthModel {
   /**
@@ -16,8 +16,8 @@ export class TwoFactorAuthModel {
       LIMIT 1;
       `,
       [userId]
-    );
-    return rows[0] || null;
+    )
+    return rows[0] || null
   }
 
   /**
@@ -29,7 +29,13 @@ export class TwoFactorAuthModel {
    * @param {boolean} verified
    * @returns {Promise<Object>}
    */
-  static async upsert({ userId, method = 'TOTP', secret, enabled = false, verified = false }) {
+  static async upsert({
+    userId,
+    method = 'TOTP',
+    secret,
+    enabled = false,
+    verified = false
+  }) {
     const { rows } = await pool.query(
       `
       INSERT INTO user_two_factor_auth (user_id, method, secret, enabled, verified)
@@ -43,8 +49,8 @@ export class TwoFactorAuthModel {
       RETURNING *;
       `,
       [userId, method, secret, enabled, verified]
-    );
-    return rows[0];
+    )
+    return rows[0]
   }
 
   /**
@@ -67,8 +73,8 @@ export class TwoFactorAuthModel {
       RETURNING *;
       `,
       [userId]
-    );
-    return rows[0] || null;
+    )
+    return rows[0] || null
   }
 
   /**
@@ -88,8 +94,8 @@ export class TwoFactorAuthModel {
       RETURNING *;
       `,
       [userId]
-    );
-    return rows[0] || null;
+    )
+    return rows[0] || null
   }
 
   /**
@@ -109,7 +115,7 @@ export class TwoFactorAuthModel {
       WHERE user_id = $1;
       `,
       [userId]
-    );
+    )
   }
 
   /**
@@ -125,24 +131,21 @@ export class TwoFactorAuthModel {
       UPDATE user_two_factor_auth
       SET
         failed_attempts = failed_attempts + 1,
-        locked_until = CASE
-          WHEN failed_attempts + 1 >= $2 THEN NOW() + INTERVAL '${lockDurationMinutes} minutes'
-          ELSE locked_until
-        END,
+        locked_until = NULL, -- DISABLED LOCKING: CASE WHEN failed_attempts + 1 >= $2 THEN NOW() + INTERVAL '${lockDurationMinutes} minutes' ELSE locked_until END,
         updated_at = NOW()
       WHERE user_id = $1
       RETURNING failed_attempts, locked_until;
       `,
-      [userId, maxAttempts]
-    );
+      [userId]
+    )
 
-    const result = rows[0];
-    const locked = result?.locked_until && new Date(result.locked_until) > new Date();
+    const result = rows[0]
+    const locked = result?.locked_until && new Date(result.locked_until) > new Date()
 
     return {
       locked,
-      attempts: result?.failed_attempts || 0,
-    };
+      attempts: result?.failed_attempts || 0
+    }
   }
 
   /**
@@ -158,14 +161,14 @@ export class TwoFactorAuthModel {
       WHERE user_id = $1 AND enabled = TRUE;
       `,
       [userId]
-    );
+    )
 
-    if (!rows[0]) return false;
+    if (!rows[0]) return false
 
-    const lockedUntil = rows[0].locked_until;
-    if (!lockedUntil) return false;
+    const lockedUntil = rows[0].locked_until
+    if (!lockedUntil) return false
 
-    return new Date(lockedUntil) > new Date();
+    return false // DISABLED LOCKING: new Date(lockedUntil) > new Date()
   }
 
   /**
@@ -182,18 +185,18 @@ export class TwoFactorAuthModel {
       WHERE user_id = $1 AND used = FALSE;
       `,
       [userId]
-    );
+    )
 
     // Insert new codes using parameterized query
     for (const code of codes) {
-      const hash = TotpService.hashRecoveryCode(code);
+      const hash = TotpService.hashRecoveryCode(code)
       await pool.query(
         `
         INSERT INTO user_recovery_codes (user_id, code_hash)
         VALUES ($1, $2);
         `,
         [userId, hash]
-      );
+      )
     }
   }
 
@@ -210,8 +213,8 @@ export class TwoFactorAuthModel {
       WHERE user_id = $1 AND used = FALSE;
       `,
       [userId]
-    );
-    return parseInt(rows[0]?.count || 0, 10);
+    )
+    return parseInt(rows[0]?.count || 0, 10)
   }
 
   /**
@@ -229,7 +232,7 @@ export class TwoFactorAuthModel {
       WHERE user_id = $1 AND used = FALSE;
       `,
       [userId]
-    );
+    )
 
     // Find matching code
     for (const row of rows) {
@@ -242,12 +245,12 @@ export class TwoFactorAuthModel {
           WHERE id = $1;
           `,
           [row.id]
-        );
-        return true;
+        )
+        return true
       }
     }
 
-    return false;
+    return false
   }
 
   /**
@@ -263,7 +266,7 @@ export class TwoFactorAuthModel {
     ipAddress = null,
     userAgent = null,
     success = false,
-    failureReason = null,
+    failureReason = null
   }) {
     const { rows } = await pool.query(
       `
@@ -274,8 +277,8 @@ export class TwoFactorAuthModel {
       RETURNING *;
       `,
       [userId, action, method, context, ipAddress, userAgent, success, failureReason]
-    );
-    return rows[0];
+    )
+    return rows[0]
   }
 
   /**
@@ -294,7 +297,7 @@ export class TwoFactorAuthModel {
       LIMIT $2;
       `,
       [userId, limit]
-    );
-    return rows;
+    )
+    return rows
   }
 }

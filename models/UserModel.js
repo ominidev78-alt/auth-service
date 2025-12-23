@@ -1,5 +1,5 @@
-import { pool } from '../config/db.js';
-import crypto from 'crypto';
+import { pool } from '../config/db.js'
+import crypto from 'crypto'
 
 export class UserModel {
   static async createOperator({
@@ -13,7 +13,7 @@ export class UserModel {
     partnerName,
     cnpjData,
     gatewayFeePercent,
-    partnerFeePercent,
+    partnerFeePercent
   }) {
     const { rows } = await pool.query(
       `
@@ -56,14 +56,21 @@ export class UserModel {
         partnerName || null,
         JSON.stringify(cnpjData || {}),
         gatewayFeePercent ?? 0,
-        partnerFeePercent ?? 100,
+        partnerFeePercent ?? 100
       ]
-    );
+    )
 
-    return rows[0];
+    return rows[0]
   }
 
-  static async create({ name, email, document, externalId, appId = null, clientSecret = null }) {
+  static async create({
+    name,
+    email,
+    document,
+    externalId,
+    appId = null,
+    clientSecret = null
+  }) {
     const { rows } = await pool.query(
       `
       INSERT INTO users (
@@ -84,11 +91,11 @@ export class UserModel {
         document || null,
         externalId || null,
         appId || null,
-        clientSecret || null,
+        clientSecret || null
       ]
-    );
+    )
 
-    return rows[0];
+    return rows[0]
   }
 
   static async createWithPassword({
@@ -102,11 +109,11 @@ export class UserModel {
     tradeName = null,
     partnerName = null,
     appId = null,
-    clientSecret = null,
+    clientSecret = null
   }) {
     // Normalizar email para lowercase
-    const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
-
+    const normalizedEmail = email ? String(email).toLowerCase().trim() : null
+    
     const { rows } = await pool.query(
       `
       INSERT INTO users (
@@ -144,11 +151,11 @@ export class UserModel {
         tradeName,
         partnerName,
         appId || null,
-        clientSecret || null,
+        clientSecret || null
       ]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async findAll() {
@@ -177,9 +184,9 @@ export class UserModel {
       ORDER BY id DESC
       LIMIT 100;
       `
-    );
+    )
 
-    return rows;
+    return rows
   }
 
   static async findById(id) {
@@ -216,18 +223,18 @@ export class UserModel {
       LIMIT 1;
       `,
       [id]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async findByEmail(email) {
     // Normalizar email para lowercase antes de buscar
-    const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
+    const normalizedEmail = email ? String(email).toLowerCase().trim() : null
     if (!normalizedEmail) {
-      return null;
+      return null
     }
-
+    
     const { rows } = await pool.query(
       `
       SELECT *
@@ -236,14 +243,14 @@ export class UserModel {
       LIMIT 1;
       `,
       [normalizedEmail]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async findByAppId(appId) {
-    if (!appId) return null;
-
+    if (!appId) return null
+    
     const { rows } = await pool.query(
       `
       SELECT
@@ -277,9 +284,9 @@ export class UserModel {
       LIMIT 1;
       `,
       [appId]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async updateDocStatus(id, { status, notes }) {
@@ -294,9 +301,9 @@ export class UserModel {
       RETURNING *;
       `,
       [id, status, notes || null]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async updateSplit(id, { gatewayFeePercent, partnerFeePercent }) {
@@ -309,10 +316,14 @@ export class UserModel {
       WHERE id = $1
       RETURNING *;
       `,
-      [id, gatewayFeePercent, partnerFeePercent]
-    );
+      [
+        id,
+        gatewayFeePercent,
+        partnerFeePercent
+      ]
+    )
 
-    return rows[0];
+    return rows[0]
   }
 
   static async updateProvider(id, provider) {
@@ -325,15 +336,12 @@ export class UserModel {
       RETURNING *;
       `,
       [id, provider || null]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
-  static async updateConfig(
-    id,
-    { webhook_url, webhook_url_pix_in, webhook_url_pix_out, ip_whitelist }
-  ) {
+  static async updateConfig(id, { webhook_url, webhook_url_pix_in, webhook_url_pix_out, ip_whitelist }) {
     const { rows } = await pool.query(
       `
       UPDATE users
@@ -345,16 +353,10 @@ export class UserModel {
       WHERE id = $1
       RETURNING *;
       `,
-      [
-        id,
-        webhook_url || null,
-        webhook_url_pix_in || null,
-        webhook_url_pix_out || null,
-        ip_whitelist || null,
-      ]
-    );
+      [id, webhook_url || null, webhook_url_pix_in || null, webhook_url_pix_out || null, ip_whitelist || null]
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async updatePassword({ userId, passwordHash }) {
@@ -367,9 +369,9 @@ export class UserModel {
       RETURNING *;
       `,
       [userId, passwordHash]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static async updateCredentials({ id, appId, clientSecret }) {
@@ -383,35 +385,35 @@ export class UserModel {
       RETURNING *;
       `,
       [id, appId || null, clientSecret || null]
-    );
+    )
 
-    return rows[0] || null;
+    return rows[0] || null
   }
 
   static generateRawCredentials() {
-    const appIdRandom = crypto.randomBytes(8).toString('hex');
-    const appId = `mg_live_${appIdRandom}`;
+    const appIdRandom = crypto.randomBytes(8).toString('hex')
+    const appId = `mg_live_${appIdRandom}`
 
-    const secretRandom = crypto.randomBytes(16).toString('hex');
-    const clientSecret = `sk_live_${secretRandom}`;
+    const secretRandom = crypto.randomBytes(16).toString('hex')
+    const clientSecret = `sk_live_${secretRandom}`
 
-    return { appId, clientSecret };
+    return { appId, clientSecret }
   }
 
   static async generateAndUpdateCredentials(userId) {
-    const { appId, clientSecret } = this.generateRawCredentials();
+    const { appId, clientSecret } = this.generateRawCredentials()
 
     const user = await this.updateCredentials({
       id: userId,
       appId,
-      clientSecret,
-    });
+      clientSecret
+    })
 
     return {
       user,
       appId,
-      clientSecret,
-    };
+      clientSecret
+    }
   }
 
   static async findTreasuryUser() {
@@ -424,20 +426,18 @@ export class UserModel {
         ORDER BY id ASC
         LIMIT 1;
         `
-      );
+      )
 
-      return rows[0] || null;
+      return rows[0] || null
     } catch (err) {
       // Se o campo is_treasury não existir, retorna null
       // O código chamador usará HOUSE_USER_ID como fallback
       if (err.message && err.message.includes('column "is_treasury" does not exist')) {
-        console.log(
-          '[findTreasuryUser] Campo is_treasury não existe na tabela users, usando fallback para HOUSE_USER_ID'
-        );
-        return null;
+        console.log('[findTreasuryUser] Campo is_treasury não existe na tabela users, usando fallback para HOUSE_USER_ID')
+        return null
       }
       // Para outros erros, relança
-      throw err;
+      throw err
     }
   }
 }

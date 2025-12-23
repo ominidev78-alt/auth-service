@@ -8,458 +8,493 @@ import { env } from '../config/env.js';
 
 const setupSchema = Joi.object({
   method: Joi.string().valid('TOTP').default('TOTP'),
-});
+  method: Joi.string().valid('TOTP').default('TOTP')
+})
 
-// Accept either a 6-digit TOTP code or a recovery code
 const verifySchema = Joi.object({
-  code: Joi.string().length(6).pattern(/^\d+$/).optional(),
-  recoveryCode: Joi.string().optional(),
-}).custom((value, helpers) => {
-  if (!value.code && !value.recoveryCode) {
-    return helpers.error('any.required', { message: 'Informe code ou recoveryCode' });
-  }
-  return value;
-});
+  code: Joi.string().length(6).pattern(/^\d+$/).required()
+})
 
-const enableSchema = Joi.object({
-  code: Joi.string().length(6).pattern(/^\d+$/).required(),
-});
-
-const recoveryCodeSchema = Joi.object({
-  code: Joi.string().required(),
-});
-
-const JWT_USER_SECRET = env.JWT_USER_SECRET || 'mutual-secret-2025';
+const disableSchema = Joi.object({
+  code: Joi.string().length(6).pattern(/^\d+$/).required()
+})
 
 export class TwoFactorAuthController {
   /**
-   * Initialize 2FA setup - generates secret and QR code
-   * POST /api/2fa/setup
+   * Start 2FA setup process
    */
   async setup(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const { value, error } = setupSchema.validate(req.body);
+      const { value, error } = setupSchema.validate(req.body)
       if (error) {
-        throw new HttpError(400, 'ValidationError', { details: error.details });
+        throw new HttpError(400, 'ValidationError', { details: error.details })
       }
 
-      const user = await UserModel.findById(userId);
-      if (!user) {
-        throw new HttpError(404, 'UserNotFound');
-      }
+      const { method } = value
 
       // Check if already enabled
-      const existing = await TwoFactorAuthModel.findByUserId(userId);
+      const existing = await TwoFactorAuthModel.findByUserId(userId)
       if (existing?.enabled) {
         throw new HttpError(400, 'TwoFactorAlreadyEnabled', {
-          message: '2FA já está ativado para este usuário',
-        });
+          message: 'O segundo fator de autenticação já está ativo.'
+        })
       }
 
       // Generate new secret
-      const secret = TotpService.generateSecret();
+      const secret = TotpService.generateSecret()
+      const user = req.user
 
-      // Save secret (not enabled yet)
+      // Standardize issuer name
+      const issuer = 'Pagandu Fintech'
+      const otpAuthUrl = TotpService.generateOtpAuthUrl(secret, user.email, issuer)
+
+      // Save secret (but not enabled yet)
       await TwoFactorAuthModel.upsert({
         userId,
-        method: value.method || 'TOTP',
+        method,
         secret,
         enabled: false,
-        verified: false,
-      });
+        verified: false
+      })
 
-      // Generate QR code
-      const otpAuthUrl = TotpService.generateOtpAuthUrl(
-        secret,
-        user.email || `user-${userId}`,
-        'Mutual Fintech'
-      );
+      // Generate QR Code as data URL
+      const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl)
 
-      const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+      // Log setup start
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
 
-      // Log setup initiation
       await TwoFactorAuthModel.addAuditLog({
         userId,
-        action: 'SETUP_INITIATED',
-        method: 'TOTP',
-        context: JSON.stringify({ email: user.email }),
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-        userAgent: req.headers['user-agent'] || null,
-        success: true,
-      });
+        action: 'SETUP_STARTED',
+        method,
+        ipAddress,
+        userAgent,
+        success: true
+      })
 
       return res.json({
         ok: true,
-        secret,
+        secret, // Show secret to user for manual entry
         qrCode: qrCodeDataUrl,
-        otpAuthUrl,
-        manualEntryKey: secret,
-      });
+        method
+      })
     } catch (err) {
-      return next(err);
+      return next(err)
     }
   }
 
   /**
    * Verify and enable 2FA
-   * POST /api/2fa/enable
    */
   async enable(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const { value, error } = enableSchema.validate(req.body);
+      const { value, error } = verifySchema.validate(req.body)
       if (error) {
-        throw new HttpError(400, 'ValidationError', { details: error.details });
+        throw new HttpError(400, 'ValidationError', { details: error.details })
       }
 
-      const config = await TwoFactorAuthModel.findByUserId(userId);
-      if (!config) {
-        throw new HttpError(404, 'TwoFactorNotSetup', {
-          message: '2FA não foi configurado. Execute /setup primeiro.',
-        });
+      const { code } = value
+
+      const config = await TwoFactorAuthModel.findByUserId(userId)
+      if (!config || config.secret === null) {
+        throw new HttpError(400, 'SetupNotStarted', {
+          message: 'Configuração de 2FA não iniciada.'
+        })
       }
 
       if (config.enabled) {
-        throw new HttpError(400, 'TwoFactorAlreadyEnabled');
+        throw new HttpError(400, 'TwoFactorAlreadyEnabled')
       }
 
-      // Check if locked
-      const isLocked = await TwoFactorAuthModel.isLocked(userId);
-      if (isLocked) {
-        throw new HttpError(423, 'TwoFactorLocked', {
-          message: '2FA está temporariamente bloqueado devido a múltiplas tentativas falhas',
-        });
-      }
-
-      // Verify code
-      const isValid = TotpService.verifyToken(value.code, config.secret);
+      // Verify token
+      const isValid = TotpService.verifyToken(code, config.secret)
       if (!isValid) {
-        const failure = await TwoFactorAuthModel.recordFailure(userId);
+        const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+        const userAgent = req.headers['user-agent'] || null
 
         await TwoFactorAuthModel.addAuditLog({
           userId,
           action: 'ENABLE_FAILED',
-          method: 'TOTP',
-          context: JSON.stringify({ code: value.code }),
-          ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-          userAgent: req.headers['user-agent'] || null,
+          method: config.method,
+          ipAddress,
+          userAgent,
           success: false,
-          failureReason: 'Invalid code',
-        });
-
-        if (failure.locked) {
-          throw new HttpError(423, 'TwoFactorLocked', {
-            message: 'Muitas tentativas falhas. 2FA bloqueado temporariamente.',
-          });
-        }
+          failureReason: 'Invalid code'
+        })
 
         throw new HttpError(400, 'InvalidCode', {
-          message: 'Código inválido',
-          attemptsRemaining: 3 - failure.attempts,
-        });
+          message: 'Código de verificação inválido.'
+        })
       }
 
-      // Generate recovery codes
-      const recoveryCodes = TotpService.generateRecoveryCodes(10);
-      await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes);
-
       // Enable 2FA
-      await TwoFactorAuthModel.enable(userId);
-      await TwoFactorAuthModel.recordSuccess(userId);
+      await TwoFactorAuthModel.enable(userId)
+
+      // Generate recovery codes
+      const recoveryCodes = TotpService.generateRecoveryCodes(10)
+      await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes)
+
+      // Log success
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
 
       await TwoFactorAuthModel.addAuditLog({
         userId,
         action: 'ENABLED',
-        method: 'TOTP',
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-        userAgent: req.headers['user-agent'] || null,
-        success: true,
-      });
+        method: config.method,
+        ipAddress,
+        userAgent,
+        success: true
+      })
 
       return res.json({
         ok: true,
-        enabled: true,
-        recoveryCodes, // Return plain codes only once
-      });
+        message: 'Segundo fator de autenticação ativado com sucesso.',
+        recoveryCodes // Show only once
+      })
     } catch (err) {
-      return next(err);
+      return next(err)
     }
   }
 
   /**
    * Disable 2FA
-   * POST /api/2fa/disable
    */
   async disable(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const config = await TwoFactorAuthModel.findByUserId(userId);
-      if (!config || !config.enabled) {
-        throw new HttpError(400, 'TwoFactorNotEnabled', {
-          message: '2FA não está ativado',
-        });
-      }
-
-      // Verify code before disabling
-      const { value, error } = verifySchema.validate(req.body);
+      const { value, error } = disableSchema.validate(req.body)
       if (error) {
-        throw new HttpError(400, 'ValidationError', { details: error.details });
+        throw new HttpError(400, 'ValidationError', { details: error.details })
       }
 
-      let isValid = false;
+      const { code } = value
 
-      if (value.recoveryCode) {
-        isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, value.recoveryCode);
-      } else if (value.code) {
-        isValid = TotpService.verifyToken(value.code, config.secret);
+      const config = await TwoFactorAuthModel.findByUserId(userId)
+      if (!config || !config.enabled) {
+        throw new HttpError(400, 'TwoFactorNotEnabled')
       }
 
+      // Verify token
+      const isValid = TotpService.verifyToken(code, config.secret)
       if (!isValid) {
+        const failure = await TwoFactorAuthModel.recordFailure(userId)
+
+        const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+        const userAgent = req.headers['user-agent'] || null
+
         await TwoFactorAuthModel.addAuditLog({
           userId,
           action: 'DISABLE_FAILED',
-          method: 'TOTP',
-          ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-          userAgent: req.headers['user-agent'] || null,
+          method: config.method,
+          ipAddress,
+          userAgent,
           success: false,
-          failureReason: 'Invalid code',
-        });
-        throw new HttpError(400, 'InvalidCode', { message: 'Código inválido' });
+          failureReason: 'Invalid code'
+        })
+
+        if (failure.locked) {
+          throw new HttpError(423, 'TwoFactorLocked', {
+            message: 'Muitas tentativas falhas. 2FA bloqueado temporariamente.'
+          })
+        }
+
+        throw new HttpError(400, 'InvalidCode', {
+          message: 'Código 2FA inválido',
+          attemptsRemaining: 3 - failure.attempts
+        })
       }
 
-      await TwoFactorAuthModel.disable(userId);
+      // Disable 2FA
+      await TwoFactorAuthModel.disable(userId)
+
+      // Log success
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
 
       await TwoFactorAuthModel.addAuditLog({
         userId,
         action: 'DISABLED',
-        method: 'TOTP',
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-        userAgent: req.headers['user-agent'] || null,
-        success: true,
-      });
+        method: config.method,
+        ipAddress,
+        userAgent,
+        success: true
+      })
 
       return res.json({
         ok: true,
-        disabled: true,
-      });
+        message: 'Segundo fator de autenticação desativado.'
+      })
     } catch (err) {
-      return next(err);
+      return next(err)
     }
   }
 
   /**
    * Get 2FA status
-   * GET /api/2fa/status
    */
   async status(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const config = await TwoFactorAuthModel.findByUserId(userId);
-      const recoveryCodesCount = config?.enabled
-        ? await TwoFactorAuthModel.getRecoveryCodesCount(userId)
-        : 0;
+      const config = await TwoFactorAuthModel.findByUserId(userId)
+      const recoveryCodesCount = await TwoFactorAuthModel.getRecoveryCodesCount(userId)
 
       return res.json({
         ok: true,
         enabled: config?.enabled || false,
-        verified: config?.verified || false,
         method: config?.method || null,
-        recoveryCodesCount,
-      });
+        lastUsed: config?.last_used_at || null,
+        recoveryCodesRemaining: recoveryCodesCount
+      })
     } catch (err) {
-      return next(err);
+      return next(err)
+    }
+  }
+
+  /**
+   * Verify code (used for sensitive operations or re-login)
+   */
+  async verify(req, res, next) {
+    try {
+      const userId = req.user?.id || req.user?.userId
+      if (!userId) {
+        throw new HttpError(401, 'Unauthorized')
+      }
+
+      const { value, error } = verifySchema.validate(req.body)
+      if (error) {
+        throw new HttpError(400, 'ValidationError', { details: error.details })
+      }
+
+      const { code } = value
+
+      const config = await TwoFactorAuthModel.findByUserId(userId)
+      if (!config || !config.enabled) {
+        throw new HttpError(400, 'TwoFactorNotEnabled')
+      }
+
+      // Check if locked
+      const isLocked = await TwoFactorAuthModel.isLocked(userId)
+      if (isLocked) {
+        throw new HttpError(423, 'TwoFactorLocked', {
+          message: '2FA está temporariamente bloqueado devido a múltiplas tentativas falhas.'
+        })
+      }
+
+      // Verify token
+      const isValid = TotpService.verifyToken(code, config.secret)
+
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
+
+      if (!isValid) {
+        const failure = await TwoFactorAuthModel.recordFailure(userId)
+
+        await TwoFactorAuthModel.addAuditLog({
+          userId,
+          action: 'VERIFY_FAILED',
+          method: config.method,
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason: 'Invalid code'
+        })
+
+        if (failure.locked) {
+          throw new HttpError(423, 'TwoFactorLocked', {
+            message: 'Muitas tentativas falhas. 2FA bloqueado temporariamente.'
+          })
+        }
+
+        throw new HttpError(400, 'InvalidCode', {
+          message: 'Código 2FA inválido',
+          attemptsRemaining: 3 - failure.attempts
+        })
+      }
+
+      // Record success
+      await TwoFactorAuthModel.recordSuccess(userId)
+
+      await TwoFactorAuthModel.addAuditLog({
+        userId,
+        action: 'VERIFY_SUCCESS',
+        method: config.method,
+        ipAddress,
+        userAgent,
+        success: true
+      })
+
+      return res.json({
+        ok: true,
+        message: 'Código verificado com sucesso.'
+      })
+    } catch (err) {
+      return next(err)
+    }
+  }
+
+  /**
+   * Verify recovery code
+   */
+  async verifyRecovery(req, res, next) {
+    try {
+      const userId = req.user?.id || req.user?.userId
+      if (!userId) {
+        throw new HttpError(401, 'Unauthorized')
+      }
+
+      const { code } = req.body
+      if (!code) {
+        throw new HttpError(400, 'CodeRequired')
+      }
+
+      const config = await TwoFactorAuthModel.findByUserId(userId)
+      if (!config || !config.enabled) {
+        throw new HttpError(400, 'TwoFactorNotEnabled')
+      }
+
+      const isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, code)
+
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
+
+      if (!isValid) {
+        await TwoFactorAuthModel.addAuditLog({
+          userId,
+          action: 'RECOVERY_FAILED',
+          method: 'RECOVERY_CODE',
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason: 'Invalid recovery code'
+        })
+
+        throw new HttpError(400, 'InvalidCode', {
+          message: 'Código de recuperação inválido.'
+        })
+      }
+
+      // Record success
+      await TwoFactorAuthModel.recordSuccess(userId)
+
+      await TwoFactorAuthModel.addAuditLog({
+        userId,
+        action: 'RECOVERY_SUCCESS',
+        method: 'RECOVERY_CODE',
+        ipAddress,
+        userAgent,
+        success: true
+      })
+
+      return res.json({
+        ok: true,
+        message: 'Código de recuperação verificado com sucesso.'
+      })
+    } catch (err) {
+      return next(err)
     }
   }
 
   /**
    * Generate new recovery codes
-   * POST /api/2fa/recovery-codes
    */
-  async generateRecoveryCodes(req, res, next) {
+  async regenerateRecoveryCodes(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const config = await TwoFactorAuthModel.findByUserId(userId);
+      const { code } = req.body
+      if (!code) {
+        throw new HttpError(400, 'CodeRequired', {
+          message: 'Código 2FA é necessário para gerar novos códigos de recuperação.'
+        })
+      }
+
+      const config = await TwoFactorAuthModel.findByUserId(userId)
       if (!config || !config.enabled) {
-        throw new HttpError(400, 'TwoFactorNotEnabled', {
-          message: '2FA não está ativado',
-        });
+        throw new HttpError(400, 'TwoFactorNotEnabled')
       }
 
-      // Verify code before generating new recovery codes
-      const { value, error } = verifySchema.validate(req.body);
-      if (error) {
-        throw new HttpError(400, 'ValidationError', { details: error.details });
-      }
-
-      let isValid = false;
-
-      if (value.recoveryCode) {
-        isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, value.recoveryCode);
-      } else if (value.code) {
-        isValid = TotpService.verifyToken(value.code, config.secret);
-      }
-
+      // Verify token first
+      const isValid = TotpService.verifyToken(code, config.secret)
       if (!isValid) {
-        throw new HttpError(400, 'InvalidCode', { message: 'Código inválido' });
+        throw new HttpError(400, 'InvalidCode')
       }
 
-      // Generate new recovery codes
-      const recoveryCodes = TotpService.generateRecoveryCodes(10);
-      await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes);
+      // Generate recovery codes
+      const recoveryCodes = TotpService.generateRecoveryCodes(10)
+      await TwoFactorAuthModel.saveRecoveryCodes(userId, recoveryCodes)
+
+      // Log success
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || null
+      const userAgent = req.headers['user-agent'] || null
 
       await TwoFactorAuthModel.addAuditLog({
         userId,
         action: 'RECOVERY_CODES_REGENERATED',
-        method: 'TOTP',
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-        userAgent: req.headers['user-agent'] || null,
-        success: true,
-      });
+        method: config.method,
+        ipAddress,
+        userAgent,
+        success: true
+      })
 
       return res.json({
         ok: true,
-        recoveryCodes, // Return plain codes only once
-      });
+        message: 'Novos códigos de recuperação gerados com sucesso.',
+        recoveryCodes
+      })
     } catch (err) {
-      return next(err);
-    }
-  }
-
-  /**
-   * Verify 2FA code (for use in other flows)
-   * POST /api/2fa/verify
-   */
-  async verify(req, res, next) {
-    try {
-      const userId = req.user?.id || req.user?.userId;
-      if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
-      }
-
-      const { value, error } = verifySchema.validate(req.body);
-      if (error) {
-        throw new HttpError(400, 'ValidationError', { details: error.details });
-      }
-
-      const config = await TwoFactorAuthModel.findByUserId(userId);
-      if (!config || !config.enabled) {
-        throw new HttpError(400, 'TwoFactorNotEnabled', {
-          message: '2FA não está ativado',
-        });
-      }
-
-      // Check if locked
-      const isLocked = await TwoFactorAuthModel.isLocked(userId);
-      if (isLocked) {
-        throw new HttpError(423, 'TwoFactorLocked', {
-          message: '2FA está temporariamente bloqueado',
-        });
-      }
-
-      let isValid = false;
-
-      if (value.recoveryCode) {
-        isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, value.recoveryCode);
-      } else if (value.code) {
-        isValid = TotpService.verifyToken(value.code, config.secret);
-      }
-
-      if (!isValid) {
-        const failure = await TwoFactorAuthModel.recordFailure(userId);
-
-        await TwoFactorAuthModel.addAuditLog({
-          userId,
-          action: 'VERIFY_FAILED',
-          method: 'TOTP',
-          context: JSON.stringify({
-            code: value.code ? 'TOTP' : 'RECOVERY',
-            hasRecoveryCode: !!value.recoveryCode,
-          }),
-          ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-          userAgent: req.headers['user-agent'] || null,
-          success: false,
-          failureReason: 'Invalid code',
-        });
-
-        if (failure.locked) {
-          throw new HttpError(423, 'TwoFactorLocked', {
-            message: 'Muitas tentativas falhas. 2FA bloqueado temporariamente.',
-          });
-        }
-
-        throw new HttpError(400, 'InvalidCode', {
-          message: 'Código inválido',
-          attemptsRemaining: 3 - failure.attempts,
-        });
-      }
-
-      await TwoFactorAuthModel.recordSuccess(userId);
-
-      await TwoFactorAuthModel.addAuditLog({
-        userId,
-        action: 'VERIFY_SUCCESS',
-        method: 'TOTP',
-        context: JSON.stringify({
-          code: value.code ? 'TOTP' : 'RECOVERY',
-          hasRecoveryCode: !!value.recoveryCode,
-        }),
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
-        userAgent: req.headers['user-agent'] || null,
-        success: true,
-      });
-
-      return res.json({
-        ok: true,
-        verified: true,
-      });
-    } catch (err) {
-      return next(err);
+      return next(err)
     }
   }
 
   /**
    * Get audit logs
-   * GET /api/2fa/audit-logs
    */
-  async getAuditLogs(req, res, next) {
+  async auditLogs(req, res, next) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.user?.id || req.user?.userId
       if (!userId) {
-        throw new HttpError(401, 'Unauthorized');
+        throw new HttpError(401, 'Unauthorized')
       }
 
-      const limit = parseInt(req.query.limit || 50, 10);
-      const logs = await TwoFactorAuthModel.getAuditLogs(userId, limit);
+      const logs = await TwoFactorAuthModel.getAuditLogs(userId)
 
       return res.json({
         ok: true,
-        logs,
-      });
+        logs: logs.map(log => ({
+          action: log.action,
+          method: log.method,
+          success: log.success,
+          ip: log.ip_address,
+          createdAt: log.created_at
+        }))
+      })
     } catch (err) {
-      return next(err);
+      return next(err)
     }
   }
 }
 
-export const twoFactorAuthController = new TwoFactorAuthController();
+export const twoFactorAuthController = new TwoFactorAuthController()

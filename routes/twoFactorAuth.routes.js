@@ -177,7 +177,7 @@ router.post('/2fa/verify', userAuth, (req, res, next) =>
  *         description: Não autenticado
  */
 router.post('/2fa/recovery-codes', userAuth, (req, res, next) =>
-  twoFactorAuthController.generateRecoveryCodes(req, res, next)
+  twoFactorAuthController.regenerateRecoveryCodes(req, res, next)
 );
 
 /**
@@ -201,7 +201,7 @@ router.post('/2fa/recovery-codes', userAuth, (req, res, next) =>
  *         description: Não autenticado
  */
 router.get('/2fa/audit-logs', userAuth, (req, res, next) =>
-  twoFactorAuthController.getAuditLogs(req, res, next)
+  twoFactorAuthController.auditLogs(req, res, next)
 );
 
 export default router;

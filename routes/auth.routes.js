@@ -1,8 +1,8 @@
-import { Router } from 'express';
-import { authController } from '../controllers/AuthController.js';
-import { userAuthController } from '../controllers/UserAuthController.js';
+import { Router } from 'express'
+import { authController } from '../controllers/AuthController.js'
+import { userAuthController } from '../controllers/UserAuthController.js'
 
-const router = Router();
+const router = Router()
 
 /**
  * @openapi
@@ -37,7 +37,9 @@ const router = Router();
  *       500:
  *         $ref: '#/components/responses/InternalServerError'
  */
-router.post('/auth/token', (req, res, next) => authController.token(req, res, next));
+router.post('/auth/token', (req, res, next) =>
+  authController.token(req, res, next)
+)
 
 /**
  * @openapi
@@ -67,7 +69,9 @@ router.post('/auth/token', (req, res, next) => authController.token(req, res, ne
  *       403:
  *         description: Acesso negado (não é ADMIN)
  */
-router.post('/admin/auth/login', (req, res, next) => userAuthController.adminLogin(req, res, next));
+router.post('/admin/auth/login', (req, res, next) =>
+  userAuthController.adminLogin(req, res, next)
+)
 
 /**
  * @openapi
@@ -85,6 +89,6 @@ router.post('/admin/auth/login', (req, res, next) => userAuthController.adminLog
  */
 router.post('/internal/operators/:id/generate-credentials', (req, res, next) =>
   authController.generateCredentials(req, res, next)
-);
+)
 
-export default router;
+export default router
