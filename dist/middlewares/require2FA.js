@@ -37,13 +37,13 @@ export async function require2FA(req, res, next) {
         if (recoveryCode) {
             isValid = await TwoFactorAuthModel.verifyRecoveryCode(userId, recoveryCode);
         }
-        else if (code) {
+        else if (code && config.secret) {
             isValid = TotpService.verifyToken(code, config.secret);
         }
         if (!isValid) {
             const failure = await TwoFactorAuthModel.recordFailure(userId);
-            const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-            const userAgent = req.headers['user-agent'] || null;
+            const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
+            const userAgent = (req.headers['user-agent'] || null);
             const context = req.path || 'UNKNOWN';
             await TwoFactorAuthModel.addAuditLog({
                 userId,
@@ -67,8 +67,8 @@ export async function require2FA(req, res, next) {
         }
         // Record success
         await TwoFactorAuthModel.recordSuccess(userId);
-        const ipAddress = req.ip || req.headers['x-forwarded-for'] || null;
-        const userAgent = req.headers['user-agent'] || null;
+        const ipAddress = (req.ip || req.headers['x-forwarded-for'] || null);
+        const userAgent = (req.headers['user-agent'] || null);
         const context = req.path || 'UNKNOWN';
         await TwoFactorAuthModel.addAuditLog({
             userId,

@@ -4,7 +4,7 @@ import { initDb } from './config/db.js';
 async function start() {
     try {
         await initDb();
-        const PORT = env.PORT || 3001;
+        const PORT = Number(env.PORT) || 3001;
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`auth-service rodando na porta ${PORT}`);
         });
